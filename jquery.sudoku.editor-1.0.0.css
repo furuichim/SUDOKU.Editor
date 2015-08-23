@@ -1,0 +1,57 @@
+#sudoku {
+    width:200px;
+    height:200px;
+}
+#data {
+    width:100%;
+}
+#answers {
+    width:100%;
+}
+div.controller {
+    box-sizing:border-box;
+    background-color:black;
+    margin-top:2px;
+}
+div.key {
+    display:inline-block;
+    background-color:#4B4BDB;
+    color:white;
+    text-align:center;
+    vertical-align:middle;
+    cursor:pointer;
+}
+div.key:hover {
+    color:gold;
+}
+div.key.disabled {
+    background-color:silver;
+    color:gray;
+}
+
+div.container {
+    box-sizing:border-box;
+    background-color:black;
+}
+div.digit {
+    display:inline-block;
+    background-color:ivory;
+    text-align:center;
+    vertical-align:middle;
+    cursor:pointer;
+}
+div.digit.initial {
+    background-color:silver;
+}
+div.digit.solved {
+    background-color:royalblue;
+}
+div.digit.selected {
+    background-color:pink;
+}
+.c1, .c2, .c4, .c5, .c7, .c8 {margin-right:1px}
+.c3, .c6  {margin-right:2px;}
+.c1 {margin-left:2px;}
+.r1, .r2, .r4, .r5, .r7, .r8 {margin-bottom:1px}
+.r3, .r6  {margin-bottom:2px;}
+.r1 {margin-top:2px;}
