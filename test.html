@@ -1,8 +1,39 @@
 <!DOCTYPE html>
 <html>
 <head>
+<style>
+#editor {
+  width:300px;
+  height:300px;
+}
+#data {
+  width:100%;
+}
+</style>
 <script type="text/javascript" src="http://jquery.com/jquery-1.11.3.min.js"></script>
+<script type="text/javascript" src="./jquery.sudoku.editor-1.0.0.js"></script>
+<script>
+$(function(){
+  $("#editor").sudoku();
+  $("#load).on("click", function(){
+    $("#editor").load($("#data").val());
+  });
+  $("#clear).on("click", function(){
+    $("#editor").clear();
+  });
+  $("#save).on("click", function(){
+    $("#editor").val($("#editor").save());
+  });
+});
+</script>
 </head>
 <body>
+<div id="editor">
+</div>
+<input type="text" id="data"/>
+<br/>
+<input type="button" id="load" value="load" />
+<input type="button" id="save" value="save" />
+<input type="button" id="clear" value="clear" />
 </body>
 </html>
