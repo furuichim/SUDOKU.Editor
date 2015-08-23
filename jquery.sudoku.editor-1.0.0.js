@@ -140,7 +140,7 @@
                 });
             });
             console.log("saved to " + data[0] + "-" + data[1]);
-            return data[0] + "-" + data[1];
+            return data[1] == "" ? data[0] : (data[0] + "-" + data[1]);
         },
         verify: function() {
             var _self = this,
