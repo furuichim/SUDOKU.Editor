@@ -1,10 +1,18 @@
+/**
+ * @fileOverview SUDOKU SOLVER ENGINE
+ * @author Masahiro Furuichi
+ * @requires jquery.js
+ * @since 2015
+ * @version 1.0.0
+ */
 (function($){
     var _methods = {
-        init: function(option, data) {
+        init: function(data) {
 
             // Calcurate the size of a cell and a container.
             var _self = this,
-                parentSize = Math.min(this.innerWidth(), this.innerHeight()),
+//                parentSize = Math.min(this.innerWidth(), this.innerHeight()),
+                parentSize = this.innerWidth(),
                 cellSize = Math.floor(parentSize / 9) - 2,
                 size = cellSize * 9 + 8 + 6,
                 $container, $controller;
@@ -13,7 +21,7 @@
             // each cell has three classes, cX, rX and gX, first two of which indicate column and row position,
             // and rest of which indicates a rect group.
             this.empty();
-            $container = $("<div/>").addClass("container").width(size).height(size).appendTo(this);
+            $container = $("<div/>").addClass("container").width(size).height(size).appendTo(this).data("option", {support:true});
             for (var r = 1; r < 10; ++ r) {
                 for (var c = 1; c < 10; ++ c) {
                     $("<div class='digit'/>")
@@ -27,12 +35,22 @@
                             "line-height":cellSize + "px"
                         })
                         .on("input", function(e, v) {
-                            if ($container.data("mode") == "creator") {
-                                $(this).data("sudoku", (1 << (parseInt(v) - 1))).addClass("initial").html(v);
+                        	if ($(this).html() == v) {
+                            	$(this).removeClass("initial, solved").html("");
                             } else {
-                                $(this).data("sudoku", (1 << (parseInt(v) - 1))).addClass("solved").html(v);
+                                $(this).data("sudoku", (1 << (parseInt(v) - 1))).html(v);
+                                if ($container.data("mode") == "creator") {
+                                    $(this).addClass("initial");
+                                } else {
+                                    $(this).addClass("solved");
+                                    if ($container.find(".initial, .solved").length == 81) {
+                                        if (_methods.verify.call(_self)) {
+                                            alert("Congratulations!!!");
+                                        }
+                                    }
+                                }
                             }
-                            _methods.narrow.call(_self);
+                            _methods.exclude.call(_self);
                         })
                         .appendTo($container);
                 }
@@ -40,15 +58,15 @@
             // add procedures on each cell in sudoku.
             $container.on("mousedown", ".digit:not(.initial)", function() {
                 $container.find(".digit.selected").removeClass("selected");
-                $(this).addClass("selected");
-                $controller.triggerHandler("refresh", [$(this).data("sudoku")]);
-            }).on("click", ".digit.initial", function() {
+                $(this).addClass("selected").removeClass("solved");
+                _methods.exclude.call(_self);
+                $controller.triggerHandler("refresh");
+            }).on("mousedown", ".digit.initial", function() {
                 if ($container.data("mode") == "creator") {
                     $container.find(".digit.selected").removeClass("selected");
-                    $(this).removeClass("initial").addClass("selected").html("");
-                    $container.find(".digit:not(.initial)").data("sudoku", 0x1ff);
-                    _methods.narrow.call(_self);
-                    $controller.triggerHandler("refresh", [$(this).data("sudoku")]);
+                    $(this).removeClass("initial").addClass("selected");
+                    _methods.exclude.call(_self);
+                    $controller.triggerHandler("refresh");
                 }
             });
 
@@ -70,11 +88,14 @@
             // add procedures on a input controller.
             $controller.on("mousedown", ".key:not(.disabled)", function() {
                 $container.find(".selected").triggerHandler("input", [$(this).html()]);
-            }).on("refresh", function(e, mask) {
+            }).on("refresh", function(e) {
                 $(this).find(".key").removeClass("disabled");
-                for (var i = 0; i < 10; ++ i) {
-                    if (((1 << i) & mask) == 0) {
-                        $(this).find(".key:contains(" + (i + 1) + ")").addClass("disabled");
+                if ($container.data("option").support == true) {
+                    var mask = $container.find(".digit.selected").data("sudoku");
+                    for (var i = 0; i < 10; ++ i) {
+                        if (((1 << i) & mask) == 0) {
+                            $(this).find(".key:contains(" + (i + 1) + ")").addClass("disabled");
+                        }
                     }
                 }
             });
@@ -87,9 +108,15 @@
             }
             return this;
         },
+        option: function(opt) {
+            this.find(".container").data("option", opt);
+            this.find(".controller").triggerHandler("refresh");
+            return this;
+        },
         clear: function() {
             this.find(".digit").removeClass("initial solved assumed selected").data("sudoku", 0x1ff).html("");
             this.find(".container").data("mode", "creator");
+            this.find(".controller").triggerHandler("refresh");
             return this;
         },
         load: function(data) {
@@ -111,15 +138,15 @@
                         });
                     }
                 });
-                
+
                 // verify data
                 if (!_methods.verify.call(this)) {
                     console.error("INVALID DATA");
                 } else {
-                    _methods.narrow.call(this);
+                    _methods.exclude.call(this);
                     console.log("successfully loaded.");
                 }
-    
+
                 // set solver mode.
                 this.find(".container").data("mode", "solver");
             }
@@ -128,7 +155,6 @@
         },
         save: function(data) {
             var _self = this, data = ["", ""];
-
             // serialize initial datas at first, then serialize solved data.
             $.each([".initial", ".solved"], function(i, cat) {
                 _self.find(".digit"+cat).each(function() {
@@ -140,157 +166,51 @@
                 });
             });
             console.log("saved to " + data[0] + "-" + data[1]);
-            return data[1] == "" ? data[0] : (data[0] + "-" + data[1]);
+            return data[0] + "-" + data[1];
         },
         verify: function() {
             var _self = this,
                 isValid = true,
-                groups = ["c1","c2","c3","c4","c5","c6","c7","c8","c9","r1","r2","r3","r4","r5","r6","r7","r8","r9","g1","g2","g3","g4","g5","g6","g7","g8","g9"];            $.each(groups, function(i, g) {
-                var test = {};
+                groups = ["c1","c2","c3","c4","c5","c6","c7","c8","c9","r1","r2","r3","r4","r5","r6","r7","r8","r9","g1","g2","g3","g4","g5","g6","g7","g8","g9"];
+            
+            $.each(groups, function(i, g) {
+                var all = 0, fixed = 0;
                 _self.find(".digit."+g).each(function() {
-                    if ($(this).html() != "") {
-                        if (test[$(this).html()] !== undefined) {
+                    if ($(this).hasClass("initial") || $(this).hasClass("solved")) {
+                        if ((fixed & $(this).data("sudoku")) == 0) {
+                            fixed |= $(this).data("sudoku");
+                        } else {
                             isValid = false;
                             return false;
-                        } else {
-                            test[$(this).html()]    = true;
                         }
                     }
+                	all |= $(this).data("sudoku");
                 });
-                if (!isValid) {
-                    // the data is invalid, so quit verifing.
+                if (!isValid || all != 0x1ff) {
+                    isValid = false;
                     return false;
                 }
             });
             return isValid;
         },
-        isNoAnswers: function() {
-            var noAnswer = false;
-            this.find(".digit:not(.initial)").each(function() {
-                if ($(this).data("sudoku") == 0) {
-                    noAnswer = true;
-                    return false;
-                }
-            });
-            return noAnswer;
-        },
-        narrow: function() {
+        exclude: function() {
             var _self = this,
-                isNarrowed = false,
                 groups = ["c1","c2","c3","c4","c5","c6","c7","c8","c9","r1","r2","r3","r4","r5","r6","r7","r8","r9","g1","g2","g3","g4","g5","g6","g7","g8","g9"];
 
+            _self.find(".digit:not(.initial):not(.solved)").data("sudoku", 0x1ff);
             $.each(groups, function(i, g) {
-                //console.debug("["+g+"]")
                 _self.find(".digit."+g).filter(".initial, .solved").each(function() {
                     var mask = ~$(this).data("sudoku");
-                    //console.debug($(this).html());
                     _self.find(".digit:not(.initial):not(.solved)."+g).each(function() {
                         var org = $(this).data("sudoku"),
                             narrowed = org & mask;
                         if (org != narrowed) {
-                            //console.debug(this.getAttribute("class") + ":" + org + ">" + narrowed);
                             $(this).data("sudoku", narrowed);
-                            isNarrowed = true;
                         }
                     });
                 });
             });
-            _self.find(".digit:not(.initial):not(.solved)").each(function() {
-                var classes = this.getAttribute("class"),
-                    c = classes.match(/c[0-9]/)[0],
-                    r = classes.match(/r[0-9]/)[0],
-                    g = classes.match(/g[0-9]/)[0],
-                    p = $(this).data("sudoku"),
-                    $target = $(this);
-                $.each([c,r,g], function(i, group) {
-                    var others = 0;
-                    _self.find(".digit:not(.initial):not(.solved)." + group).not("."+c+"."+r).each(function(){
-                        others |= $(this).data("sudoku");
-                    });
-                    for (var i = 0; i < 10; ++ i) {
-                        var test = (1 << i);
-                        if (((test & p) == test) && ((test & others) == 0)) {
-                            //console.info("ok");
-                            $target.data("sudoku", test);
-                            isNarrowed = true;
-                            return false;
-                        }
-                    }
-                }); 
-            });
-            return isNarrowed;
-        },
-        solve: function() {
-            var _self = this;
-
-            // If the question has less than 17 hits, there is NO answer.
-            // This had been proved mathematically. 
-            if (_self.find(".digit.initial").length <= 16) {
-                console.error("There is no answer.");
-                return false;
-            }
-
-            // Try to solve by the reguler method.
-            while (_methods.narrow.call(this)) {
-                // fix value at the cell which has single candidate.
-                _self.find(".digit:not(.initial):not(.solved)").each(function() {
-                    var data = $(this).data("sudoku"), i;
-                    for (var i = 0; i < 10; ++ i) {
-                        if ((1 << i) == data) {
-                            $(this).addClass("solved").html(i + 1);
-                        }
-                    }
-                });
-            }
-
-            // check if there is a answer at this point.
-            if (_methods.isNoAnswers.call(this)) {
-                // Due to the wrong assumption, there is no answer.
-                return;
-            }
-
-            // Try to solve by the assuming method.
-            if (this.find(".digit.initial, .digit.solved").length < 81) {
-                var checkPoint = _methods.save.call(this),
-                    _target = _self.find(".digit:not(.initial):not(.solved):not(.assumed):first"),
-                    candidates = _target.data("sudoku"),
-                    answers = [],
-                    result;
-
-                for (var i = 0; i < 10; ++ i) {
-                    if ((1 << i) & candidates) {
-                        // ASSUMING...
-                        console.log("assumeding:" + _target[0].getAttribute("class") + ":" + candidates.toString(2) + ">>>" + (i + 1));   
-                        _target.addClass("solved").addClass("assumed").data("sudoku", (1 << i)).html(i + 1);
-
-                        // verify if this assumption is correct.
-                        result = _methods.solve.call(this);
-                        if (!result) {
-                            // wrong assumption, restore to the checkpoint and examin another assumptions.
-                            _methods.load.call(this, checkPoint);
-                        } else {
-                            // correct assumption, merge answers to result.
-                            $.merge(answers, result);
-                        }
-                    }
-                }
-                return answers;
-            }
-
-            // At this point, all the cells are solved. 
-            // However the answer could be wrong, so we must verify the answer.
-            if (_methods.verify.call(this)) {
-                return [_methods.save.call(this)]; 
-            } else {
-                return null;
-            }
-        },
-        dump: function() {
-            console.log("------[DUMP]------")
-            this.find(".digit").each(function() {
-                console.log(this.getAttribute("class") + ":" + $(this).data("sudoku").toString(2));
-            });
-            console.log("------------------")
+            return this;
         }
     };
 
