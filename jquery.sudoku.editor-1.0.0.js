@@ -11,8 +11,8 @@
 
             // Calcurate the size of a cell and a container.
             var _self = this,
-//                parentSize = Math.min(this.innerWidth(), this.innerHeight()),
-                parentSize = this.innerWidth(),
+                parentSize = Math.min(this.innerWidth(), this.innerHeight()),
+//                parentSize = this.innerWidth(),
                 cellSize = Math.floor(parentSize / 9) - 2,
                 size = cellSize * 9 + 8 + 6,
                 $container, $controller;
