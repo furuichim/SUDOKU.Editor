@@ -11,8 +11,8 @@
 
             // Calcurate the size of a cell and a container.
             var _self = this,
-                parentSize = Math.min(this.innerWidth(), this.innerHeight()),
-//                parentSize = this.innerWidth(),
+//                parentSize = Math.min(this.innerWidth(), this.innerHeight()),
+                parentSize = this.innerWidth(),
                 cellSize = Math.floor(parentSize / 9) - 2,
                 size = cellSize * 9 + 8 + 6,
                 $container, $controller;
@@ -35,8 +35,8 @@
                             "line-height":cellSize + "px"
                         })
                         .on("input", function(e, v) {
-                        	if ($(this).html() == v) {
-                            	$(this).removeClass("initial, solved").html("");
+                            if ($(this).html() == v) {
+                                $(this).removeClass("initial, solved").html("");
                             } else {
                                 $(this).data("sudoku", (1 << (parseInt(v) - 1))).html(v);
                                 if ($container.data("mode") == "creator") {
@@ -67,6 +67,40 @@
                     $(this).removeClass("initial").addClass("selected");
                     _methods.exclude.call(_self);
                     $controller.triggerHandler("refresh");
+                }
+            });
+            $(document).on("keydown", function(e) {
+                if ((e.which >= 0x25) && (e.which <= 0x28)) {
+                    var classes = $container.find(".digit.selected")[0].getAttribute("class"),
+                        c = classes.match(/c[0-9]/)[0].charAt(1),
+                        r = classes.match(/r[0-9]/)[0].charAt(1),
+                        mode = $container.data("mode");
+                    switch(e.which) {
+                        case 0x28:	// VK_DOWN
+                            do {
+                                if (r != 9) ++ r;
+                            } while ((r != 9) && (mode == "solver") && $container.find(".digit.c" + c + ".r" + r).hasClass("initial"));
+                            break;
+                        case 0x26:  // VK_UP
+                            do {
+                                if (r != 1) -- r;
+                            } while ((r != 1) && (mode == "solver") && $container.find(".digit.c" + c + ".r" + r).hasClass("initial"));
+                            break;
+                        case 0x25:	// VK_LEFT
+                            do {
+                                if (c != 1) -- c;
+                            } while ((c != 1) && (mode == "solver") && $container.find(".digit.c" + c + ".r" + r).hasClass("initial"));
+                            break;
+                        case 0x27:	// VK_RIGHT
+                            do {
+                                if (c != 9) ++ c;
+                            } while ((c != 9) && (mode == "solver") && $container.find(".digit.c" + c + ".r" + r).hasClass("initial"));
+                            break;
+                    }
+                    $container.find(".digit.c" + c + ".r" + r).trigger("mousedown");
+                    e.preventDefault();
+                } else if ((e.which >= 0x31) && (e.which <= 0x39)) {
+                    $controller.find(".key:contains(" + (e.which - 0x30) + ")").trigger("mousedown");
                 }
             });
 
@@ -119,9 +153,23 @@
             this.find(".controller").triggerHandler("refresh");
             return this;
         },
+        reset: function() {
+            if (this.find(".container").data("mode") == "solver") {
+                this.find(".digit:not(.initial)").removeClass("solved assumed selected").data("sudoku", 0x1ff).html("");
+                this.find(".controller").triggerHandler("refresh");
+            }
+            return this;
+        },
+        isValidData: function(data) {
+            return /^([1-9]{3}){17,}$/.test(data) || /^([1-9]{3}){17,}-([1-9]{3}){1,81}$/.test(data);
+        },
         load: function(data) {
             console.log("loading from " + data);
             var _self = this, classesName = ["initial", "solved"];
+
+            if (!_methods.isValidData.call(this, data)) {
+                return this;
+            }
 
             // clear previous data at first.
             _methods.clear.call(this);
@@ -154,7 +202,7 @@
             return this;
         },
         save: function(data) {
-            var _self = this, data = ["", ""];
+            var _self = this, data = ["", ""], ret;
             // serialize initial datas at first, then serialize solved data.
             $.each([".initial", ".solved"], function(i, cat) {
                 _self.find(".digit"+cat).each(function() {
@@ -165,8 +213,9 @@
                     data[i] += c + r + v;
                 });
             });
-            console.log("saved to " + data[0] + "-" + data[1]);
-            return data[0] + "-" + data[1];
+            ret = (data[1] != "") ? (data[0] + "-" + data[1]) : data[0];
+            console.log("saved to " + ret);
+            return ret;
         },
         verify: function() {
             var _self = this,
