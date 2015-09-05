@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Cache-Control" content="no-cache">
+<style>
+body {
+    width:100%;
+}
+#sudoku {
+    width:100%;
+    height:100%;
+}
+#alert {
+}
+</style>
+<link rel="stylesheet" type="text/css" href="css/jquery.sudoku.editor.css"/>
+<link rel="stylesheet" type="text/css" href="css/jquery.mobile-1.4.5/jquery.mobile-1.4.5.css"/>
+<script type="text/javascript" src="js/jquery-1.10.1.min.js"></script>
+<script type="text/javascript" src="js/jquery.mobile-1.4.5/jquery.mobile-1.4.5.min.js"></script>
+<script type="text/javascript" src="js/ocrad.js"></script>
+<script type="text/javascript" src="js/jquery.sudoku.editor.js"></script>
+<script type="text/javascript" src="js/jquery.sudoku.solver.js"></script>
+<script>
+$(function(){
+    console.log("ready");
+    $("#sudoku").sudoku({});
+
+    //-----------------------
+    // Solveing procedure
+    //-----------------------
+    $("#solve").on("click", function() {
+        var question = $("#sudoku").sudoku("save"),
+            solver = new Sudoku(),
+            answers = solver.load(question).solve($("#max-search").val());
+        if (!answers) {
+            $("#sudoku").sudoku("load", question);
+            alert("There is NO answer for this question, or you have entered wrong numbers");
+        } else {
+            // TODO:複数の答えがある場合の表示方法を考える必要がある
+            $("#sudoku").sudoku("load", answers[0]);
+        }
+    });
+
+    //-----------------------
+    // Clear procedure
+    //-----------------------
+    $("#clear-page").on("pageshow", function() {
+        //TODO:クリアページ表示時の処理。
+        //     ここでは、保存済みのデータの場合は、#removeボタンを有効にする処理が必要になる
+    });
+    $("#clear").on("click", function() {
+        $("#sudoku").sudoku("clear");
+        console.log("clear was clicked.");
+    });
+    $("#reset").on("click", function() {
+        $("#sudoku").sudoku("reset");
+        console.log("reset was clicked.");
+    });
+    $("#remove").on("click", function() {
+        //TODO:ここではセッションストレージからの削除処理が必要になる
+    });
+
+    //-----------------------
+    // Saveing procedure
+    //-----------------------
+    $("#save-page").on("pageshow", function() {
+        var data = $("#sudoku").sudoku("save");
+        $("#saveddata").val(data);
+    });
+    $("#save").on("click", function() {
+        var data = $("#saveddata").val(),
+            desc = $("#description").val() || "untitled",
+            zeroPad = function(value) {return ("0" + value).slice(-2);},
+            now = new Date(),
+            yyyymmdd = now.getFullYear() + zeroPad(now.getMonth()+1) + zeroPad(now.getDate()),
+            hhmmss = zeroPad(now.getHours()) + zeroPad(now.getMinutes()) + zeroPad(now.getSeconds());
+        if (typeof(window.sessionStorage) !== 'undefined') {
+            alert(yyyymmdd + "-" + hhmmss);
+            // TODO: セッションストレージに保存する。
+        }
+    });
+
+    //-----------------------
+    // Options procedure
+    //-----------------------
+    $("#input-support").on("change", function() {
+        if ($(this).val() == "on") {
+            $("#sudoku").sudoku("option", {support:true});
+        } else {
+            $("#sudoku").sudoku("option", {support:false});
+        }
+    });
+
+    //-----------------------
+    // Loading procedure
+    //-----------------------
+    $("#load-page").on("pageshow", function() {
+        //TODO:セッションストレージから、ロード可能な問題を取り出して、リストを作成する
+    });
+    $("#load-from-rawdata").on("click", function(e) {
+        var rawdata = $("#rawdata").val();
+        if ($("#sudoku").sudoku("isValidData", rawdata)) {
+            $("#sudoku").sudoku("load", rawdata);
+        } else {
+            if (typeof(window.navigator.vibrate) !== 'undefined') {
+                window.navigator.vibrate(200);
+            }
+            $("#alert").popup({corners: false, overlayTheme: "a"}).popup("open");
+            return false;
+        }
+    });
+    $("#load-from-image").on("click", function() {
+        // TODO:実際にはビデオカメラからの映像を元にOCR処理を行う
+        var image = $("<img>").attr("src", "無題5.bmp").appendTo("body");
+            rawdata = OCRImage(image[0]);
+        image.remove();
+        if ($("#sudoku").sudoku("isValidData", rawdata)) {
+            $("#sudoku").sudoku("load", rawdata);
+        } else {
+            if (typeof(window.navigator.vibrate) !== 'undefined') {
+                window.navigator.vibrate(200);
+            }
+            $("#alert").popup({corners: false, overlayTheme: "a"}).popup("open");
+            return false;
+        }
+    });
+
+    OCRImage = function(image){
+        var letters = OCRAD(image, { verbose: true, numeric: true }).letters,
+            digits = [],
+            margin=1000, miny=100, maxy=0, minx=100, maxx=0, height=0, _GOSA=10;
+
+        letters.filter(function(letter){
+            // select the letters which have vanna white's approval
+            return letter.matches.some(function(match){
+                return /[1-9]/.test(match.letter)
+            })
+        }).forEach(function(letter){
+            digits.push(letter);
+        });
+
+        $.each(digits, function(i, l1) {
+            $.each(digits, function(j, l2) {
+                if (i != j) {
+                    var delta = Math.abs(l1.y - l2.y);
+                    if ((delta >= _GOSA) && (margin > delta)) {
+                        margin = delta;
+                    }
+                }
+            });
+            height = l1.height;
+            if (miny > l1.y) miny = l1.y;
+            if (minx > l1.x) minx = l1.x;
+            if (maxy < l1.y) maxy = l1.y;
+            if (maxx < l1.x) maxx = l1.x;
+        });
+        height /= digits.length;
+
+        var size = margin * 9,
+            rows = Math.floor((maxy - miny) / margin) + 1,
+            colums = Math.floor((maxx - minx) / margin) + 1,
+            offsetx = minx - ((margin - height) / 2),
+            offsety = miny - ((margin - height) / 2),
+            data = "";
+
+        $.each(digits, function(i, d) {
+            x = Math.floor((d.x - offsetx) / margin) + 1,
+            y = Math.floor((d.y - offsety) / margin) + 1;
+            if (((x >=0) && (x <= 9)) &&
+                ((y > 0) && (y <= 9)) &&
+                /[0-9]{1}/.test(d.matches[0].letter))
+            data += x.toString() + y.toString() + d.matches[0].letter;
+            console.log("[" + x + "][" + y + "]letter=" + d.matches[0].letter);
+        });
+
+        console.log(data);
+        return data;
+    };
+});
+</script>
+</head>
+<body>
+    <div data-role="page" id="main">
+        <div data-role="header" data-position="fixed">
+            <a href="#solve" data-icon="search" data-mini="true" data-transition="slide" id="solve">Solve</a>
+            <h5>SUDOKU Solver</h5>
+            <a href="#options-page" data-icon="gear" data-mini="true" data-transition="slide">Options</a>
+        </div>
+        <div role="main" class="ui-content">
+            <div id="sudoku"></div>
+        </div>
+        <div data-role="footer" data-position="fixed">
+            <div data-role="navbar" data-iconpos="top">
+                <ul>
+                  <li><a href="#load-page" data-icon="arrow-d" data-transition="slideup">Load</a></li>
+                  <li><a href="#clear-page" data-icon="delete" data-transition="slideup">clear</a></li>
+                  <li><a href="#save-page" data-icon="check" data-transition="slideup ">Save</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div data-role="page" id="options-page">
+        <div data-role="header" data-position="fixed">
+            <h5>Options</h5>
+            <a href="#main" data-transition="slide" data-direction="reverse" data-icon="check" class="ui-btn-right">Ok</a>
+        </div>
+        <div  role="main" class="ui-content">
+            <fieldset>
+              <div data-role="fieldcontain">
+                <label for="input-support">Input Support:</label>
+                <select id="input-support" data-role="flipswitch">
+                  <option value="off">Off</option>
+                  <option value="on" selected>On</option>
+                </select>
+              </div>
+            </fieldset>
+            <fieldset>
+              <div data-role="fieldcontain">
+                <label for="max-search">Maximum number of answers searched:</label>
+                <input type="range" id="max-search" value="10" min="1" max="20">
+              </div>
+            </fieldset>
+         </div>
+    </div>
+    <div data-role="page" id="load-page">
+        <div data-role="header" data-position="fixed">
+            <h5>Load data</h5>
+            <a href="#main" data-transition="slidedown "data-icon="back" class="ui-btn-right">Back</a>
+        </div>
+        <div  role="main" class="ui-content">
+            <div data-role="tabs">
+                Load from ... <br/><br/>
+                <div data-role="navbar">
+                    <ul>
+                        <li><a href="#raw" class="ui-btn-active">Raw data</a></li>
+                        <li><a href="#cache">Saved data</a></li>
+                        <li><a href="#camera">Camera</a></li>
+                    </ul>
+                </div>
+                <div id="raw" class="ui-content">
+                    <fieldset>
+                        <div data-role="fieldcontain">
+                            <label for="rawdata">Enter a serialized data:</label>
+                            <textarea id="rawdata" rows="4" maxlength="274" data-autogrow="false"></textarea>
+                        </div>
+                    </fieldset>
+                    <a id="load-from-rawdata" href="#main" data-role="button" data-icon="arrow-d" data-transition="slidedown">Load</a>
+                </div>
+                <div id="cache" class="ui-content">
+                    <fieldset>
+                        <div data-role="fieldcontain">
+                            <label for="cacheddata">Select a saved dataaaaaa:</label>
+                            <select id="cacheddata">
+                                <option>aaaaaa</option>
+                                <option>aaaaaa</option>
+                                <option>aaaaaa</option>
+                                <option>aaaaaa</option>
+                                <option>aaaaaa</option>
+                                <option>aaaaaa</option>
+                            </select>
+                        </div>
+                    </fieldset>
+                    <a href="#main" data-role="button" data-icon="arrow-d" data-transition="slidedown">Load</a>
+                </div>
+                <div id="camera" class="ui-content">
+                    <fieldset>
+                        <div data-role="fieldcontain">
+                            <label for="image">Select a image file:</label>
+                            <input type="file" id="image"></input>
+                        </div>
+                    </fieldset>
+                    <a id="load-from-image" href="#main" data-role="button" data-icon="arrow-d" data-transition="slidedown">Load</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div data-role="page" id="clear-page">
+        <div data-role="header" data-position="fixed">
+            <h5>Clear</h5>
+            <a href="#main" data-transition="slidedown "data-icon="back" class="ui-btn-right">Back</a>
+        </div>
+        <div role="main" class="ui-content">
+            <a id="clear" href="#main" data-role="button" data-transition="slidedown">Clear inputed data</a>
+            <a id="reset" href="#main" data-role="button" data-transition="slidedown">Restore to the loaded point</a>
+            <a id="remove" href="#main" data-role="button" data-transition="slidedown">Remove this question from db</a>
+        </div>
+    </div>
+    <div data-role="page" id="save-page">
+        <div data-role="header" data-position="fixed">
+            <h5>Save</h5>
+            <a href="#main" data-transition="slidedown "data-icon="back" class="ui-btn-right">Back</a>
+        </div>
+        <div role="main" class="ui-content">
+            <fieldset>
+                <div data-role="fieldcontain">
+                    <label for="description">description:</label>
+                    <input type="text" id="description"/>
+                </div>
+            </fieldset>
+            <fieldset>
+                <div data-role="fieldcontain">
+                    <label for="saveddata">rawdata:</label>
+                    <textarea id="saveddata" rows="4" maxlength="274" data-autogrow="false" readonly></textarea>
+                </div>
+            </fieldset>
+            <a id="save" href="#" data-role="button" data-icon="check" data-transition="slidedown">Save</a>
+        </div>
+    </div>
+    <div data-role="popup" id="alert">
+        <p>Invalid data was specified.</p>
+    </div>
+</body>
+</html>
