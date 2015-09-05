@@ -27,6 +27,8 @@ $(function(){
     console.log("ready");
     $("#sudoku").sudoku({});
 
+    var currentData = "";
+
     //-----------------------
     // Solveing procedure
     //-----------------------
@@ -47,8 +49,11 @@ $(function(){
     // Clear procedure
     //-----------------------
     $("#clear-page").on("pageshow", function() {
-        //TODO:クリアページ表示時の処理。
-        //     ここでは、保存済みのデータの場合は、#removeボタンを有効にする処理が必要になる
+        if (currentData != "") {
+            $("#remove").removeAttr("disabled");
+        } else {
+            $("#remove").attr("disabled",true);
+        }
     });
     $("#clear").on("click", function() {
         $("#sudoku").sudoku("clear");
@@ -59,7 +64,9 @@ $(function(){
         console.log("reset was clicked.");
     });
     $("#remove").on("click", function() {
-        //TODO:ここではセッションストレージからの削除処理が必要になる
+        if (typeof(window.sessionStorage) !== 'undefined') {
+            window.sessionStorage.removeItem(currentData);
+        }
     });
 
     //-----------------------
@@ -70,15 +77,15 @@ $(function(){
         $("#saveddata").val(data);
     });
     $("#save").on("click", function() {
-        var data = $("#saveddata").val(),
+        var data = $("#saveddata").val().replace(/-[1-9]*/, ""),
             desc = $("#description").val() || "untitled",
             zeroPad = function(value) {return ("0" + value).slice(-2);},
             now = new Date(),
             yyyymmdd = now.getFullYear() + zeroPad(now.getMonth()+1) + zeroPad(now.getDate()),
             hhmmss = zeroPad(now.getHours()) + zeroPad(now.getMinutes()) + zeroPad(now.getSeconds());
         if (typeof(window.sessionStorage) !== 'undefined') {
-            alert(yyyymmdd + "-" + hhmmss);
-            // TODO: セッションストレージに保存する。
+            window.sessionStorage.setItem(yyyymmdd + hhmmss + "_" + desc, data);
+            console.log("[" + yyyymmdd + hhmmss + "_" + desc + "] saved "+ data);
         }
     });
 
@@ -97,25 +104,34 @@ $(function(){
     // Loading procedure
     //-----------------------
     $("#load-page").on("pageshow", function() {
-        //TODO:セッションストレージから、ロード可能な問題を取り出して、リストを作成する
+        if (typeof(window.sessionStorage) !== 'undefined') {
+            $("#cached-data").empty();
+            for (var i = 0; i <  window.sessionStorage.length; ++ i) {
+                var key = window.sessionStorage.key(i),
+                    value = window.sessionStorage.getItem(key);
+                $("<option></option>").val(value).html(key).appendTo("#cached-data");
+            }
+        }
+    });
+    $("#load-from-cache").on("click", function(e) {
+        currentData = $("#cached-data").text();
+        return loadRawData($("#cached-data").val());
     });
     $("#load-from-rawdata").on("click", function(e) {
-        var rawdata = $("#rawdata").val();
-        if ($("#sudoku").sudoku("isValidData", rawdata)) {
-            $("#sudoku").sudoku("load", rawdata);
-        } else {
-            if (typeof(window.navigator.vibrate) !== 'undefined') {
-                window.navigator.vibrate(200);
-            }
-            $("#alert").popup({corners: false, overlayTheme: "a"}).popup("open");
-            return false;
-        }
+        currentData = "";
+        return loadRawData($("#rawdata").val());
     });
     $("#load-from-image").on("click", function() {
         // TODO:実際にはビデオカメラからの映像を元にOCR処理を行う
-        var image = $("<img>").attr("src", "無題5.bmp").appendTo("body");
+        var image = $("<img>").attr("src", "無題.png").appendTo("body");
             rawdata = OCRImage(image[0]);
         image.remove();
+
+        currentData = "";
+        return loadRawData(rawdata);
+    });
+
+    var loadRawData = function(rawdata) {
         if ($("#sudoku").sudoku("isValidData", rawdata)) {
             $("#sudoku").sudoku("load", rawdata);
         } else {
@@ -125,7 +141,7 @@ $(function(){
             $("#alert").popup({corners: false, overlayTheme: "a"}).popup("open");
             return false;
         }
-    });
+    },
 
     OCRImage = function(image){
         var letters = OCRAD(image, { verbose: true, numeric: true }).letters,
@@ -251,18 +267,12 @@ $(function(){
                 <div id="cache" class="ui-content">
                     <fieldset>
                         <div data-role="fieldcontain">
-                            <label for="cacheddata">Select a saved dataaaaaa:</label>
-                            <select id="cacheddata">
-                                <option>aaaaaa</option>
-                                <option>aaaaaa</option>
-                                <option>aaaaaa</option>
-                                <option>aaaaaa</option>
-                                <option>aaaaaa</option>
-                                <option>aaaaaa</option>
+                            <label for="cached-data">Select a saved dataaaaaa:</label>
+                            <select id="cached-data">
                             </select>
                         </div>
                     </fieldset>
-                    <a href="#main" data-role="button" data-icon="arrow-d" data-transition="slidedown">Load</a>
+                    <a id="load-from-cache" href="#main" data-role="button" data-icon="arrow-d" data-transition="slidedown">Load</a>
                 </div>
                 <div id="camera" class="ui-content">
                     <fieldset>
